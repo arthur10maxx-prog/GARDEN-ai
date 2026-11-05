@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>GARDEN AI | สแกนพรรณไม้</title>
+
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+</head>
+
+<body>
+
+    <main class="chat-page">
+
+        <div class="chat-container">
+
+            <div class="chat-header">
+
+                <div class="chat-logo">
+                    🌿
+                </div>
+
+                <div>
+                    <h1>GARDEN AI</h1>
+
+                    <p>
+                        AI วิเคราะห์พรรณไม้
+                    </p>
+                </div>
+
+            </div>
+
+
+            <div style="text-align:center; padding:20px;">
+
+                <h2>📷 สแกนพรรณไม้</h2>
+
+                <p>
+                    ใช้กล้องมือถือส่องพรรณไม้
+                    เพื่อให้ AI วิเคราะห์
+                </p>
+
+                <button
+                    id="startButton"
+                    onclick="init()"
+                    style="
+                        padding:14px 25px;
+                        font-size:18px;
+                        border:none;
+                        border-radius:12px;
+                        cursor:pointer;
+                    "
+                >
+                    📷 เปิดกล้อง
+                </button>
+
+
+                <div
+                    id="webcam-container"
+                    style="
+                        margin:20px auto;
+                        display:flex;
+                        justify-content:center;
+                    "
+                ></div>
+
+
+                <div
+                    id="result"
+                    style="
+                        font-size:20px;
+                        font-weight:bold;
+                        margin:20px 0;
+                    "
+                >
+                    รอการสแกน...
+                </div>
+
+
+                <div id="label-container"></div>
+
+
+                <button
+                    onclick="location.href='chat.html'"
+                    style="
+                        margin-top:20px;
+                        padding:12px 20px;
+                        font-size:16px;
+                        border:none;
+                        border-radius:10px;
+                        cursor:pointer;
+                    "
+                >
+                    🤖 ถาม GARDEN AI
+                </button>
+
+                <br><br>
+
+                <a href="index.html">
+                    ← กลับหน้าหลัก
+                </a>
+
+            </div>
+
+        </div>
+
+    </main>
+
+
+<script>
+
+    // ========================================
+    // GARDEN AI - SCANNER
+    // ========================================
+
+    // สำคัญ:
+    // เปลี่ยน URL ตรงนี้ให้ตรงกับโมเดลของคุณ
+    const URL = "./my_model/";
+
+
+    let model;
+    let webcam;
+    let maxPredictions;
+
+
+    // ========================================
+    // เปิดกล้อง
+    // ========================================
+
+    async function init() {
+
+        try {
+
+            document.getElementById("result").innerHTML =
+                "⏳ กำลังโหลด AI...";
+
+
+            const modelURL =
+                URL + "model.json";
+
+            const metadataURL =
+                URL + "metadata.json";
+
+
+            model = await tmImage.load(
+                modelURL,
+                metadataURL
+            );
+
+
+            maxPredictions =
+                model.getTotalClasses();
+
+
+            const flip = true;
+
+
+            webcam =
+                new tmImage.Webcam(
+                    300,
+                    300,
+                    flip
+                );
+
+
+            await webcam.setup();
+
+
+            await webcam.play();
+
+
+            window.requestAnimationFrame(loop);
+
+
+            document
+                .getElementById("webcam-container")
+                .appendChild(
+                    webcam.canvas
+                );
+
+
+            document
+                .getElementById("startButton")
+                .style.display = "none";
+
+
+            document
+                .getElementById("result")
+                .innerHTML =
+                "📷 กำลังวิเคราะห์พรรณไม้...";
+
+
+        }
+
+        catch (error) {
+
+            console.error(error);
+
+            document
+                .getElementById("result")
+                .innerHTML =
+                "❌ ไม่สามารถเปิดกล้องได้";
+
+        }
+
+    }
+
+
+    // ========================================
+    // Loop
+    // ========================================
+
+    async function loop() {
+
+        webcam.update();
+
+        await predict();
+
+        window.requestAnimationFrame(loop);
+
+    }
+
+
+    // ========================================
+    // วิเคราะห์ภาพ
+    // ========================================
+
+    async function predict() {
+
+        const prediction =
+            await model.predict(
+                webcam.canvas
+            );
+
+
+        let highest =
+            prediction[0];
+
+
+        for (
+            let i = 1;
+            i < prediction.length;
+            i++
+        ) {
+
+            if (
+                prediction[i].probability >
+                highest.probability
+            ) {
+
+                highest =
+                    prediction[i];
+
+            }
+
+        }
+
+
+        const className =
+            highest.className;
+
+
+        const confidence =
+            (
+                highest.probability * 100
+            ).toFixed(0);
+
+
+        document
+            .getElementById("result")
+            .innerHTML = `
+
+                🌿 ตรวจพบ: <strong>
+                ${className}
+                </strong>
+
+                <br><br>
+
+                🎯 ความมั่นใจ:
+                <strong>
+                ${confidence}%
+                </strong>
+
+            `;
+
+    }
+
+</script>
+
+</body>
+</html>
