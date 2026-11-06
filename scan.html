@@ -161,9 +161,10 @@
     // model.json และ metadata.json อยู่ในโฟลเดอร์เดียวกับ scan.html
 
   // ตำแหน่งโฟลเดอร์ AI Model
-const MODEL_BASE = new URL("./my_model/", window.location.href);
+// ตำแหน่งโฟลเดอร์หลักของ GARDEN AI
+const MODEL_BASE = new URL("./", window.location.href);
 
-// ตำแหน่งไฟล์โมเดล
+// ตำแหน่งไฟล์ AI Model
 const MODEL_URL =
     new URL("model.json", MODEL_BASE).href;
 
