@@ -2,27 +2,18 @@
 <html lang="th">
 
 <head>
-
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+    <title>GARDEN AI | วิเคราะห์พรรณไม้</title>
 
-    <title>KRAM AI | สแกนใบคราม</title>
+    <link rel="stylesheet" href="style.css">
 
-    <link
-        rel="stylesheet"
-        href="style.css"
-    >
-
+    <!-- TensorFlow และ Teachable Machine -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 
 </head>
-
 
 <body>
 
@@ -30,9 +21,7 @@
 
     <div class="chat-container">
 
-
         <!-- HEADER -->
-
         <div class="chat-header">
 
             <div class="chat-logo">
@@ -40,39 +29,25 @@
             </div>
 
             <div>
-
-                <h1>KRAM AI</h1>
-
-                <p>
-                    AI วิเคราะห์ใบคราม
-                </p>
-
+                <h1>GARDEN AI</h1>
+                <p>AI วิเคราะห์พรรณไม้</p>
             </div>
 
         </div>
 
 
         <!-- SCANNER -->
+        <div style="text-align:center; padding:20px;">
 
-        <div
-            style="
-                text-align:center;
-                padding:20px;
-            "
-        >
-
-            <h2>
-                📷 สแกนใบคราม
-            </h2>
+            <h2>📷 สแกนพรรณไม้</h2>
 
             <p>
                 ใช้กล้องหลังของโทรศัพท์
-                เพื่อวิเคราะห์ใบคราม
+                เพื่อวิเคราะห์พรรณไม้
             </p>
 
 
             <!-- CAMERA -->
-
             <div
                 id="camera-container"
                 style="
@@ -103,8 +78,7 @@
             </div>
 
 
-            <!-- START -->
-
+            <!-- START BUTTON -->
             <button
                 id="startButton"
                 onclick="startCamera()"
@@ -115,19 +89,13 @@
 
 
             <!-- SWITCH CAMERA -->
-
             <button
                 id="switchButton"
                 onclick="switchCamera()"
                 class="kram-button"
                 style="
                     display:none;
-                    background:
-                    linear-gradient(
-                        135deg,
-                        #555,
-                        #333
-                    );
+                    background:linear-gradient(135deg, #555, #333);
                 "
             >
                 🔄 สลับกล้อง
@@ -135,7 +103,6 @@
 
 
             <!-- RESULT -->
-
             <div
                 id="result"
                 style="
@@ -143,34 +110,32 @@
                     font-weight:bold;
                     margin:25px 0;
                 "
+                aria-live="polite"
             >
                 รอการสแกน...
             </div>
 
 
             <!-- CLASS RESULT -->
-
             <div
                 id="label-container"
-                style="
-                    font-size:16px;
-                "
+                style="font-size:16px;"
             ></div>
 
 
             <!-- CHAT -->
-
             <button
                 onclick="location.href='chat.html'"
                 class="kram-button chat-button"
             >
-                🤖 ถาม KRAM AI
+                🤖 ถาม GARDEN AI
             </button>
 
 
             <br>
 
 
+            <!-- BACK HOME -->
             <a
                 href="index.html"
                 class="back-home"
@@ -188,17 +153,45 @@
 <script>
 
     // =========================================
-    // KRAM AI CAMERA
+    // GARDEN AI CAMERA
     // =========================================
 
 
-    const MODEL_URL = "./my_model/";
+    // ตำแหน่งไฟล์ AI Model
+    // model.json และ metadata.json อยู่ในโฟลเดอร์เดียวกับ scan.html
+
+  // ตำแหน่งโฟลเดอร์ AI Model
+const MODEL_BASE = new URL("./my_model/", window.location.href);
+
+// ตำแหน่งไฟล์โมเดล
+const MODEL_URL =
+    new URL("model.json", MODEL_BASE).href;
+
+const METADATA_URL =
+    new URL("metadata.json", MODEL_BASE).href;
 
 
-    let model;
+    // =========================================
+    // ตัวแปรของระบบ
+    // =========================================
 
-    let video =
+    const video =
         document.getElementById("camera");
+
+    const startButton =
+        document.getElementById("startButton");
+
+    const switchButton =
+        document.getElementById("switchButton");
+
+    const resultElement =
+        document.getElementById("result");
+
+    const labelContainer =
+        document.getElementById("label-container");
+
+
+    let model = null;
 
     let stream = null;
 
@@ -206,25 +199,117 @@
 
     let isRunning = false;
 
+    let isStarting = false;
+
+    let animationFrameId = null;
+
 
     // =========================================
-    // โหลด AI
+    // แสดงข้อความ
+    // =========================================
+
+    function showMessage(message) {
+
+        resultElement.textContent = message;
+
+    }
+
+
+    // =========================================
+    // แสดงข้อผิดพลาด
+    // =========================================
+
+    function showError(error) {
+
+        console.error("GARDEN AI ERROR:", error);
+
+        const detail =
+            error && error.message
+                ? error.message
+                : String(error || "ไม่ทราบสาเหตุ");
+
+        showMessage("❌ เกิดข้อผิดพลาด: " + detail);
+
+    }
+
+
+    // =========================================
+    // โหลด AI MODEL
     // =========================================
 
     async function loadAI() {
 
-        const modelURL =
-            MODEL_URL + "model.json";
+        if (model) return;
 
-        const metadataURL =
-            MODEL_URL + "metadata.json";
+        if (typeof tmImage === "undefined") {
 
-
-        model =
-            await tmImage.load(
-                modelURL,
-                metadataURL
+            throw new Error(
+                "โหลด Teachable Machine ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ต"
             );
+
+        }
+
+
+        showMessage("🤖 กำลังโหลดโมเดล AI...");
+
+
+        // ตรวจสอบ model.json
+        const modelResponse =
+            await fetch(MODEL_URL);
+
+        if (!modelResponse.ok) {
+
+            throw new Error(
+                "ไม่พบ model.json (HTTP " +
+                modelResponse.status +
+                ")"
+            );
+
+        }
+
+
+        // ตรวจสอบ metadata.json
+        const metadataResponse =
+            await fetch(METADATA_URL);
+
+        if (!metadataResponse.ok) {
+
+            throw new Error(
+                "ไม่พบ metadata.json (HTTP " +
+                metadataResponse.status +
+                ")"
+            );
+
+        }
+
+
+        // ตรวจสอบรูปแบบ JSON
+        await modelResponse.json();
+
+        await metadataResponse.json();
+
+
+        // โหลดโมเดล
+        model = await tmImage.load(
+            MODEL_URL,
+            METADATA_URL
+        );
+
+
+        if (!model || model.getTotalClasses() === 0) {
+
+            model = null;
+
+            throw new Error(
+                "ไม่พบคลาสสำหรับจำแนกภาพในโมเดล AI"
+            );
+
+        }
+
+
+        console.log(
+            "GARDEN AI โหลดโมเดลสำเร็จ"
+        );
 
     }
 
@@ -233,172 +318,203 @@
     // เปิดกล้อง
     // =========================================
 
-    async function startCamera() {
-
-        try {
-
-            document
-                .getElementById("result")
-                .innerHTML =
-                "⏳ กำลังเตรียม AI...";
-
-
-            if (!model) {
-
-                await loadAI();
-
-            }
-
-
-            await openCamera();
-
-
-            document
-                .getElementById("startButton")
-                .style.display =
-                "none";
-
-
-            document
-                .getElementById("switchButton")
-                .style.display =
-                "flex";
-
-
-            video.style.display =
-                "block";
-
-
-            isRunning = true;
-
-
-            predict();
-
-
-        }
-
-        catch (error) {
-
-            console.error(error);
-
-
-            document
-                .getElementById("result")
-                .innerHTML =
-
-                "❌ ไม่สามารถเปิดกล้องได้" +
-
-                "<br><br>" +
-
-                "<small>" +
-
-                "กรุณาอนุญาตให้เว็บไซต์ใช้กล้อง" +
-
-                "</small>";
-
-        }
-
-    }
-
-
-    // =========================================
-    // เปิดกล้องตาม facingMode
-    // =========================================
-
     async function openCamera() {
 
-        // ปิดกล้องเดิมก่อน
+        if (
+            !navigator.mediaDevices ||
+            !navigator.mediaDevices.getUserMedia
+        ) {
 
+            throw new Error(
+                "เบราว์เซอร์ไม่รองรับกล้อง หรือเว็บไซต์ไม่ได้เปิดผ่าน HTTPS"
+            );
+
+        }
+
+
+        // ปิดกล้องเดิมก่อน
         if (stream) {
 
             stream
                 .getTracks()
-                .forEach(
-                    track =>
-                    track.stop()
-                );
+                .forEach(track => track.stop());
+
+            stream = null;
 
         }
 
 
-        stream =
-            await navigator.mediaDevices
-                .getUserMedia({
+        // ขออนุญาตใช้กล้อง
+        const newStream =
+            await navigator.mediaDevices.getUserMedia({
 
-                    video: {
+                video: {
 
-                        facingMode:
-                            {
-                                ideal:
-                                currentFacingMode
-                            }
+                    facingMode: {
+                        ideal: currentFacingMode
+                    }
 
-                    },
+                },
 
-                    audio: false
+                audio: false
 
-                });
+            });
 
 
-        video.srcObject =
-            stream;
+        stream = newStream;
 
+        video.srcObject = stream;
+
+        video.style.display = "block";
 
         await video.play();
-
-
-        document
-            .getElementById("result")
-            .innerHTML =
-            "📷 กำลังวิเคราะห์ใบคราม...";
 
     }
 
 
     // =========================================
-    // สลับกล้อง
+    // เริ่มต้นระบบสแกน
+    // =========================================
+
+    async function startCamera() {
+
+        if (isStarting || isRunning) return;
+
+        isStarting = true;
+
+        startButton.disabled = true;
+
+        startButton.textContent =
+            "⏳ กำลังเริ่มระบบ...";
+
+        labelContainer.innerHTML = "";
+
+
+        try {
+
+            // ตรวจสอบ HTTPS
+            if (!window.isSecureContext) {
+
+                throw new Error(
+                    "กรุณาเปิดเว็บไซต์ผ่าน HTTPS เพื่อใช้งานกล้อง"
+                );
+
+            }
+
+
+            // เปิดกล้อง
+            showMessage("📷 กำลังเปิดกล้อง...");
+
+            await openCamera();
+
+
+            // โหลด AI
+            await loadAI();
+
+
+            // เริ่มวิเคราะห์ภาพ
+            isRunning = true;
+
+            switchButton.style.display =
+                "inline-block";
+
+            startButton.style.display =
+                "none";
+
+            showMessage(
+                "🌿 กำลังวิเคราะห์พรรณไม้..."
+            );
+
+            predict();
+
+        }
+
+
+        catch (error) {
+
+            stopCamera();
+
+            showError(error);
+
+            startButton.disabled = false;
+
+            startButton.textContent =
+                "📷 เปิดกล้องอีกครั้ง";
+
+        }
+
+
+        finally {
+
+            isStarting = false;
+
+        }
+
+    }
+
+
+    // =========================================
+    // สลับกล้องหน้า / กล้องหลัง
     // =========================================
 
     async function switchCamera() {
 
-        if (
-            currentFacingMode ===
-            "environment"
-        ) {
+        if (!stream) return;
 
-            currentFacingMode =
-                "user";
+
+        const previousFacingMode =
+            currentFacingMode;
+
+
+        if (currentFacingMode === "environment") {
+
+            currentFacingMode = "user";
 
         }
 
         else {
 
-            currentFacingMode =
-                "environment";
+            currentFacingMode = "environment";
 
         }
 
 
-        document
-            .getElementById("result")
-            .innerHTML =
-            "🔄 กำลังเปลี่ยนกล้อง...";
+        switchButton.disabled = true;
+
+        showMessage(
+            "🔄 กำลังเปลี่ยนกล้อง..."
+        );
 
 
         try {
 
             await openCamera();
 
+            showMessage(
+                "🌿 กำลังวิเคราะห์พรรณไม้..."
+            );
+
         }
+
 
         catch (error) {
 
-            console.error(error);
+            currentFacingMode =
+                previousFacingMode;
 
-            document
-                .getElementById("result")
-                .innerHTML =
-                "❌ ไม่สามารถเปลี่ยนกล้องได้";
+            showError(
+                new Error(
+                    "ไม่สามารถเปลี่ยนกล้องได้: " +
+                    error.message
+                )
+            );
+
+        }
+
+
+        finally {
+
+            switchButton.disabled = false;
 
         }
 
@@ -406,26 +522,19 @@
 
 
     // =========================================
-    // วิเคราะห์ภาพ
+    // วิเคราะห์ภาพจากกล้อง
     // =========================================
 
     async function predict() {
 
-        if (!isRunning) {
-
-            return;
-
-        }
+        if (!isRunning || !model) return;
 
 
-        if (
-            video.readyState <
-            2
-        ) {
+        // รอให้กล้องพร้อม
+        if (video.readyState < 2) {
 
-            requestAnimationFrame(
-                predict
-            );
+            animationFrameId =
+                requestAnimationFrame(predict);
 
             return;
 
@@ -434,108 +543,153 @@
 
         try {
 
-            const prediction =
-                await model.predict(
-                    video
-                );
+            const predictions =
+                await model.predict(video);
 
 
-            let highest =
-                prediction[0];
+            if (!isRunning) return;
 
 
-            for (
-                let i = 1;
-                i < prediction.length;
-                i++
-            ) {
+            // เรียงลำดับความมั่นใจ
+            predictions.sort(
+                (a, b) =>
+                    b.probability - a.probability
+            );
 
-                if (
-                    prediction[i]
-                        .probability
-                    >
-                    highest.probability
-                ) {
 
-                    highest =
-                        prediction[i];
+            const highest =
+                predictions[0];
 
-                }
+
+            if (highest) {
+
+                const confidence =
+                    (
+                        highest.probability * 100
+                    ).toFixed(1);
+
+
+                resultElement.innerHTML =
+                    "🌿 ตรวจพบ: <strong></strong><br><br>" +
+                    "🎯 ความมั่นใจ: <strong>" +
+                    confidence +
+                    "%</strong>";
+
+
+                resultElement.querySelector("strong")
+                    .textContent = highest.className;
+
+
+                // แสดงผลทุกคลาส
+                labelContainer.innerHTML = "";
+
+
+                predictions.forEach(item => {
+
+                    const row =
+                        document.createElement("p");
+
+                    row.textContent =
+                        item.className +
+                        " : " +
+                        (
+                            item.probability * 100
+                        ).toFixed(1) +
+                        "%";
+
+                    labelContainer.appendChild(row);
+
+                });
 
             }
 
-
-            const className =
-                highest.className;
-
-
-            const confidence =
-                (
-                    highest.probability *
-                    100
-                ).toFixed(0);
-
-
-            document
-                .getElementById("result")
-                .innerHTML = `
-
-                    🌿 ตรวจพบ:
-                    <strong>
-                    ${className}
-                    </strong>
-
-                    <br><br>
-
-                    🎯 ความมั่นใจ:
-                    <strong>
-                    ${confidence}%
-                    </strong>
-
-                `;
-
-
         }
+
 
         catch (error) {
 
-            console.error(error);
+            console.error(
+                "Prediction ERROR:",
+                error
+            );
+
+            showMessage(
+                "⚠️ วิเคราะห์ภาพไม่สำเร็จ กำลังลองใหม่..."
+            );
 
         }
 
 
-        requestAnimationFrame(
-            predict
-        );
+        // วิเคราะห์ต่อเนื่อง
+        if (isRunning) {
+
+            animationFrameId =
+                requestAnimationFrame(predict);
+
+        }
 
     }
 
 
     // =========================================
-    // ปิดกล้องเมื่อออกจากหน้า
+    // ปิดกล้อง
+    // =========================================
+
+    function stopCamera() {
+
+        isRunning = false;
+
+
+        // ยกเลิกการวิเคราะห์
+        if (animationFrameId !== null) {
+
+            cancelAnimationFrame(
+                animationFrameId
+            );
+
+            animationFrameId = null;
+
+        }
+
+
+        // ปิดกล้อง
+        if (stream) {
+
+            stream
+                .getTracks()
+                .forEach(track => track.stop());
+
+            stream = null;
+
+        }
+
+
+        video.pause();
+
+        video.srcObject = null;
+
+        video.style.display = "none";
+
+
+        switchButton.style.display =
+            "none";
+
+        startButton.style.display =
+            "inline-block";
+
+    }
+
+
+    // =========================================
+    // ปิดกล้องเมื่อออกจากหน้าเว็บ
     // =========================================
 
     window.addEventListener(
         "beforeunload",
-        function() {
-
-            if (stream) {
-
-                stream
-                    .getTracks()
-                    .forEach(
-                        track =>
-                        track.stop()
-                    );
-
-            }
-
-        }
+        stopCamera
     );
 
 </script>
 
-
 </body>
-
 </html>
